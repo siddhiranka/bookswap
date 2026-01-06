@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - BookSwap</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #4e2804;
+            margin: 0;
+            padding: 0;
+        }
+        #login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .login-container {
+            background: rgb(214, 180, 147);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-container form {
+            display: flex;
+            flex-direction: column;
+        }
+        .login-container label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #3a1c0e;
+        }
+        .login-container input {
+            margin-bottom: 20px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .login-btn {
+            padding: 12px;
+            background-color: #3a1c0e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .login-btn:hover {
+            background-color: #5a2d16;
+        }
+        .switch-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .switch-link a {
+            color: #3a1c0e;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 20px;
+            text-decoration: none;
+            color: #3a1c0e;
+            font-size: 14px;
+        }
+        .back-link i {
+            margin-right: 5px;
+        }
+        .error {
+            color: #d93025;
+            font-weight: 600;
+            font-size: 13px;
+            margin-top: -15px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-wrapper">
+        <div class="login-container">
+            <a href="index.html" class="back-link"><i class="ri-arrow-left-line"></i> Back to Home</a>
+            <form id="signupForm">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Choose a username" required />
+                <div class="error" id="usernameError"></div>
+
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="Enter your email" required />
+                <div class="error" id="emailError"></div>
+
+                <label for="password">Password (min. 6 characters)</label>
+                <input type="password" id="password" placeholder="Create a password" required minlength="6" />
+                <div class="error" id="passwordError"></div>
+
+                <button type="submit" class="login-btn">Sign Up</button>
+            </form>
+            <div class="switch-link">
+                <a href="login.html">Already have an account? Login</a>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import { auth } from './firebase-config.js';
+        import { createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const signupForm = document.getElementById('signupForm');
+        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const usernameError = document.getElementById('usernameError');
+        const emailError = document.getElementById('emailError');
+        const passwordError = document.getElementById('passwordError');
+
+        signupForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            usernameError.textContent = '';
+            emailError.textContent = '';
+            passwordError.textContent = '';
+
+            if (usernameInput.value.trim() === '') {
+                usernameError.textContent = 'Please enter a username.';
+                return;
+            }
+            
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                
+                await updateProfile(userCredential.user, {
+                    displayName: usernameInput.value
+                });
+
+                alert("Account Created & Logged In!");
+                window.location.href = "dashboard.html";
+
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    emailError.textContent = 'This email address is already in use.';
+                } else if (error.code === 'auth/invalid-email') {
+                    emailError.textContent = 'Please enter a valid email address.';
+                } else if (error.code === 'auth/weak-password') {
+                    passwordError.textContent = 'Password is too weak.';
+                } else {
+                    emailError.textContent = "An error occurred during sign-up.";
+                }
+            }
+        });
+    </script>
+</body>
+</html>

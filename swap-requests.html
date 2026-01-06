@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swap Requests - BookSwap</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+</head>
+<body>
+    <nav id="navbar">
+        <div id="navleft">
+            <a href="dashboard.html"><i class="ri-arrow-left-line"></i> Back to Dashboard</a>
+        </div>
+        <div id="navright">
+            <a href="dashboard.html" style="color: white;">Swap Requests</a>
+        </div>
+    </nav>
+
+    <div class="library-container" style="padding-top: 15vh;">
+        
+        <div class="my-books-list">
+            <h2>Incoming Requests (People want your books)</h2>
+            <div id="incomingList" class="request-list">
+                <p>Loading...</p>
+            </div>
+        </div>
+
+        <div class="my-books-list">
+            <h2>Sent Requests (You want their books)</h2>
+            <div id="outgoingList" class="request-list">
+                <p>Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verify Modal -->
+    <div id="verifyModal" class="modal">
+        <div class="modal-content chat-container" style="height: auto; min-height: 300px;">
+            <div class="chat-header-bar">
+                <h2>Verify Receipt</h2>
+                <span class="close-modal" id="closeVerifyBtn">&times;</span>
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px; color: #3a1c0e;">
+                <p><strong>Received your book?</strong><br>Upload a photo of the book you received to complete the swap verification.</p>
+                
+                <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #d3c5b4;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: bold;">Upload Image</label>
+                    <input type="file" id="verifyImageInput" accept="image/*" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <img id="verifyPreview" src="" style="max-width: 100%; max-height: 200px; margin-top: 10px; display: none; border-radius: 5px; border: 1px solid #ccc; object-fit: cover;">
+                </div>
+
+                <button id="submitVerifyBtn" class="submit-btn" style="background-color: #3a1c0e; margin-top: 10px;">Submit Verification</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Modal -->
+    <div id="chatModal" class="modal">
+        <div class="modal-content chat-container">
+            <div class="chat-header-bar">
+                <h2 id="chatHeader">Chat</h2>
+                <span class="close-modal" id="closeChatBtn">&times;</span>
+            </div>
+            <div id="chatMessages" class="chat-messages">
+                <!-- Messages will be loaded here -->
+            </div>
+            <div class="chat-input-area">
+                <button id="attachBtn" class="chat-action-btn" title="Attach File"><i class="ri-attachment-2"></i></button>
+                <input type="text" id="chatInput" placeholder="Type a message...">
+                <button id="sendMsgBtn" class="chat-action-btn" title="Send Message"><i class="ri-send-plane-fill"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { collection, query, where, getDocs, updateDoc, doc, getDoc, addDoc, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const incomingList = document.getElementById('incomingList');
+        const outgoingList = document.getElementById('outgoingList');
+        
+        // Chat Elements
+        const chatModal = document.getElementById('chatModal');
+        const chatHeader = document.getElementById('chatHeader');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendMsgBtn = document.getElementById('sendMsgBtn');
+        const closeChatBtn = document.getElementById('closeChatBtn');
+        const attachBtn = document.getElementById('attachBtn');
+
+        // Verify Elements
+        const verifyModal = document.getElementById('verifyModal');
+        const closeVerifyBtn = document.getElementById('closeVerifyBtn');
+        const verifyImageInput = document.getElementById('verifyImageInput');
+        const verifyPreview = document.getElementById('verifyPreview');
+        const submitVerifyBtn = document.getElementById('submitVerifyBtn');
+
+        let currentUser = null;
+        let currentChatRequestId = null;
+        let currentChatUnsubscribe = null;
+        let currentVerifyRequestId = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadRequests();
+            } else {
+                window.location.href = "login.html";
+            }
+        });
+
+        async function loadRequests() {
+            // 1. Load Incoming
+            const qIn = query(collection(db, "swap_requests"), where("receiverId", "==", currentUser.uid));
+            const snapIn = await getDocs(qIn);
+            incomingList.innerHTML = '';
+            if (snapIn.empty) incomingList.innerHTML = '<p>No incoming requests.</p>';
+            
+            for (const d of snapIn.docs) {
+                const req = d.data();
+                
+                let contactInfo = '';
+                if (req.status === 'accepted') {
+                    const senderDoc = await getDoc(doc(db, "users", req.senderId));
+                    const senderData = senderDoc.exists() ? senderDoc.data() : {};
+                    
+                    const isVerified = !!req.receiverVerificationImage;
+                    const verifyBtnText = isVerified ? "Verified" : "Verify Receipt";
+                    const verifyBtnStyle = isVerified ? "background-color: #2e7d32; opacity: 0.8;" : "background-color: #b6733d;";
+                    const verifyBtnDisabled = isVerified ? "disabled" : "";
+
+                    contactInfo = `
+                        <div class="contact-box">
+                            <p><strong>Shipping Address:</strong><br>${senderData.address || 'No address provided'}</p>
+                            <div style="display:flex; gap:10px; margin-top:10px;">
+                                <button class="chat-btn" style="flex:1;"><i class="ri-chat-1-line"></i> Chat</button>
+                                <button class="verify-btn" ${verifyBtnDisabled} style="flex:1; color:white; border:none; padding:8px; border-radius:5px; cursor:pointer; font-weight:bold; ${verifyBtnStyle}"><i class="ri-image-add-line"></i> ${verifyBtnText}</button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'request-card';
+                div.innerHTML = `
+                    <div class="req-info">
+                        <p><strong>${req.senderName}</strong> wants <strong>${req.requestedBookTitle}</strong></p>
+                        <p>Offers: <strong>${req.offeredBookTitle}</strong></p>
+                        <span class="badge ${req.status}">${req.status}</span>
+                        ${contactInfo}
+                    </div>
+                    ${req.status === 'pending' ? `
+                    <div class="req-actions">
+                        <button class="accept-btn" onclick="handleRequest('${d.id}', 'accepted', '${req.requestedBookId}', '${req.offeredBookId}')">Accept</button>
+                        <button class="reject-btn" onclick="handleRequest('${d.id}', 'rejected')">Reject</button>
+                    </div>` : ''}
+                `;
+                // Bind events
+                const acceptBtn = div.querySelector('.accept-btn');
+                const rejectBtn = div.querySelector('.reject-btn');
+                if(acceptBtn) acceptBtn.onclick = () => handleRequest(d.id, 'accepted', req.requestedBookId, req.offeredBookId);
+                if(rejectBtn) rejectBtn.onclick = () => handleRequest(d.id, 'rejected');
+                
+                const chatBtn = div.querySelector('.chat-btn');
+                if(chatBtn) chatBtn.onclick = () => openChat(d.id, req.senderName);
+
+                const verifyBtn = div.querySelector('.verify-btn');
+                if(verifyBtn && !req.receiverVerificationImage) verifyBtn.onclick = () => openVerifyModal(d.id);
+                
+                incomingList.appendChild(div);
+            }
+
+            // 2. Load Outgoing
+            const qOut = query(collection(db, "swap_requests"), where("senderId", "==", currentUser.uid));
+            const snapOut = await getDocs(qOut);
+            outgoingList.innerHTML = '';
+            if (snapOut.empty) outgoingList.innerHTML = '<p>No sent requests.</p>';
+
+            for (const d of snapOut.docs) {
+                const req = d.data();
+                
+                let contactInfo = '';
+                if (req.status === 'accepted') {
+                    const receiverDoc = await getDoc(doc(db, "users", req.receiverId));
+                    const receiverData = receiverDoc.exists() ? receiverDoc.data() : {};
+                    
+                    const isVerified = !!req.senderVerificationImage;
+                    const verifyBtnText = isVerified ? "Verified" : "Verify Receipt";
+                    const verifyBtnStyle = isVerified ? "background-color: #2e7d32; opacity: 0.8;" : "background-color: #b6733d;";
+                    const verifyBtnDisabled = isVerified ? "disabled" : "";
+
+                    contactInfo = `
+                        <div class="contact-box">
+                            <p><strong>Shipping Address:</strong><br>${receiverData.address || 'No address provided'}</p>
+                            <div style="display:flex; gap:10px; margin-top:10px;">
+                                <button class="chat-btn" style="flex:1;"><i class="ri-chat-1-line"></i> Chat</button>
+                                <button class="verify-btn" ${verifyBtnDisabled} style="flex:1; color:white; border:none; padding:8px; border-radius:5px; cursor:pointer; font-weight:bold; ${verifyBtnStyle}"><i class="ri-image-add-line"></i> ${verifyBtnText}</button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'request-card';
+                div.innerHTML = `
+                    <div class="req-info">
+                        <p>You requested <strong>${req.requestedBookTitle}</strong> from ${req.receiverName}</p>
+                        <p>Offered: ${req.offeredBookTitle}</p>
+                        <span class="badge ${req.status}">${req.status}</span>
+                        ${contactInfo}
+                    </div>
+                `;
+                
+                const chatBtn = div.querySelector('.chat-btn');
+                if(chatBtn) chatBtn.onclick = () => openChat(d.id, req.receiverName);
+
+                const verifyBtn = div.querySelector('.verify-btn');
+                if(verifyBtn && !req.senderVerificationImage) verifyBtn.onclick = () => openVerifyModal(d.id);
+                
+                outgoingList.appendChild(div);
+            }
+        }
+
+        window.handleRequest = async (reqId, status, myBookId, theirBookId) => {
+            if(!confirm(`Are you sure you want to ${status} this request?`)) return;
+
+            try {
+                // Update Request Status
+                await updateDoc(doc(db, "swap_requests", reqId), { status: status });
+
+                if (status === 'accepted') {
+                    // Mark books as 'swapping'
+                    if(myBookId) await updateDoc(doc(db, "books", myBookId), { status: "swapping" });
+                    if(theirBookId) await updateDoc(doc(db, "books", theirBookId), { status: "swapping" });
+                    alert("Swap Accepted! Check your email/chat for delivery details.");
+                } else {
+                    alert("Request Rejected.");
+                }
+                loadRequests();
+            } catch (e) {
+                console.error(e);
+                alert("Error updating request.");
+            }
+        };
+
+        // --- Chat Logic ---
+        function openChat(reqId, otherName) {
+            currentChatRequestId = reqId;
+            chatHeader.textContent = `Chat with ${otherName}`;
+            chatModal.style.display = "block";
+            chatMessages.innerHTML = '<p style="text-align:center; color:#888;">Loading messages...</p>';
+
+            // Subscribe to messages subcollection
+            const q = query(
+                collection(db, "swap_requests", reqId, "messages"), 
+                orderBy("timestamp", "asc")
+            );
+
+            if (currentChatUnsubscribe) currentChatUnsubscribe();
+
+            currentChatUnsubscribe = onSnapshot(q, (snapshot) => {
+                chatMessages.innerHTML = '';
+                if (snapshot.empty) {
+                    chatMessages.innerHTML = '<p style="text-align:center; color:#888; margin-top:20px;">Start the conversation!</p>';
+                }
+                
+                snapshot.forEach(doc => {
+                    const msg = doc.data();
+                    const div = document.createElement('div');
+                    const isMe = msg.senderId === currentUser.uid;
+                    div.className = `message-bubble ${isMe ? 'msg-sent' : 'msg-received'}`;
+                    div.textContent = msg.text;
+                    chatMessages.appendChild(div);
+                });
+                
+                // Auto scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        }
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text || !currentChatRequestId) return;
+
+            try {
+                await addDoc(collection(db, "swap_requests", currentChatRequestId, "messages"), {
+                    text: text,
+                    senderId: currentUser.uid,
+                    senderName: currentUser.displayName,
+                    timestamp: serverTimestamp()
+                });
+                chatInput.value = '';
+            } catch (e) {
+                console.error("Error sending message:", e);
+            }
+        }
+
+        // Bind Chat Events
+        closeChatBtn.onclick = () => {
+            chatModal.style.display = "none";
+            if (currentChatUnsubscribe) currentChatUnsubscribe();
+        };
+        
+        sendMsgBtn.onclick = sendMessage;
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        attachBtn.onclick = () => {
+            alert("File attachment feature is not yet implemented.");
+        };
+
+        // --- Verify Logic ---
+        window.openVerifyModal = (reqId) => {
+            currentVerifyRequestId = reqId;
+            verifyImageInput.value = "";
+            verifyPreview.style.display = "none";
+            verifyPreview.src = "";
+            verifyModal.style.display = "block";
+        };
+
+        closeVerifyBtn.onclick = () => {
+            verifyModal.style.display = "none";
+        };
+
+        verifyImageInput.onchange = () => {
+            const file = verifyImageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    verifyPreview.src = e.target.result;
+                    verifyPreview.style.display = "block";
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        submitVerifyBtn.onclick = async () => {
+            const file = verifyImageInput.files[0];
+            if (!file || !currentVerifyRequestId) return alert("Please select an image.");
+
+            try {
+                submitVerifyBtn.textContent = "Uploading...";
+                submitVerifyBtn.disabled = true;
+
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async () => {
+                    const base64Img = reader.result;
+                    
+                    const docRef = doc(db, "swap_requests", currentVerifyRequestId);
+                    const docSnap = await getDoc(docRef);
+                    
+                    if(docSnap.exists()) {
+                        const data = docSnap.data();
+                        const updateData = {};
+                        
+                        // If I am the sender, I update senderVerificationImage
+                        if (data.senderId === currentUser.uid) {
+                            updateData.senderVerificationImage = base64Img;
+                        } else {
+                            updateData.receiverVerificationImage = base64Img;
+                        }
+                        
+                        await updateDoc(docRef, updateData);
+                        alert("Verification submitted successfully!");
+                        verifyModal.style.display = "none";
+                        loadRequests();
+                    }
+                };
+            } catch (e) {
+                console.error(e);
+                alert("Error uploading verification.");
+            } finally {
+                submitVerifyBtn.textContent = "Submit Verification";
+                submitVerifyBtn.disabled = false;
+            }
+        };
+        
+        window.onclick = (event) => {
+            if (event.target == verifyModal) verifyModal.style.display = "none";
+            if (event.target == chatModal) {
+                chatModal.style.display = "none";
+                if (currentChatUnsubscribe) currentChatUnsubscribe();
+            }
+        };
+    </script>
+</body>
+</html>

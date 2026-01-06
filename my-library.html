@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Library - BookSwap</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+</head>
+<body>
+    <nav id="navbar">
+        <div id="navleft">
+            <a href="dashboard.html"><i class="ri-arrow-left-line"></i> Back to Dashboard</a>
+        </div>
+        <div id="navright">
+            <a href="dashboard.html" style="color: white;">My Library</a>
+        </div>
+    </nav>
+
+    <div class="library-container" style="padding-top: 15vh;">
+        <!-- Add Book Section -->
+        <div class="add-book-section">
+            <h2>Add a New Book</h2>
+            <form id="addBookForm">
+                <div class="form-group">
+                    <label>Book Title</label>
+                    <input type="text" id="bookTitle" required placeholder="e.g. The Great Gatsby">
+                </div>
+                <div class="form-group">
+                    <label>Author</label>
+                    <input type="text" id="bookAuthor" required placeholder="e.g. F. Scott Fitzgerald">
+                </div>
+                <div class="form-group">
+                    <label>Genre</label>
+                    <select id="bookGenre" required>
+                        <option value="">Select Genre</option>
+                        <option value="Fiction">Fiction</option>
+                        <option value="Non-Fiction">Non-Fiction</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="Sci-Fi">Sci-Fi</option>
+                        <option value="Academic">Academic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Condition</label>
+                    <select id="bookCondition" required>
+                        <option value="Like New">Like New</option>
+                        <option value="Good">Good</option>
+                        <option value="Fair">Fair</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Book Cover Image</label>
+                    <input type="file" id="bookImage" accept="image/*" required>
+                </div>
+                <button type="submit" class="submit-btn" id="addBtn">Add to Library</button>
+            </form>
+        </div>
+
+        <!-- List Books Section -->
+        <div class="my-books-list">
+            <h2>My Collection</h2>
+            <div id="booksGrid" class="books-grid">
+                <!-- Books will be loaded here dynamically -->
+                <p>Loading your books...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js?v=3"></script>
+</body>
+</html>

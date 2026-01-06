@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BookSwap</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+</head>
+<body>
+    <nav id="navbar">
+        <div id="navleft">
+            <a href="dashboard.html" style="font-size: 4vh;">BookSwap Dashboard</a>
+        </div>
+        <div id="navright">
+            <span id="welcomeMsg" style="color: white; margin-right: 20px; font-weight: 600;"></span>
+            <button id="logoutBtn" style="background: #d93025; color: white; border: none; cursor: pointer;">Logout</button>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <h1>Welcome Back!</h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>My Books</h3>
+                <h1 id="bookCount">0</h1>
+                <p>Listed in Library</p>
+            </div>
+            <div class="stat-card">
+                <h3>Active Swaps</h3>
+                <h1>0</h1>
+                <p>Pending Requests</p>
+            </div>
+            <div class="stat-card">
+                <h3>Completed</h3>
+                <h1>0</h1>
+                <p>Successful Swaps</p>
+            </div>
+        </div>
+
+        <div class="action-grid">
+            <a href="my-library.html" class="action-card">
+                <i class="ri-book-2-line"></i>
+                <h3>My Library</h3>
+                <p>Add and manage your books</p>
+            </a>
+            <a href="browse.html" class="action-card">
+                <i class="ri-search-line"></i>
+                <h3>Browse Books</h3>
+                <p>Find books to swap</p>
+            </a>
+            <a href="swap-requests.html" class="action-card">
+                <i class="ri-exchange-line"></i>
+                <h3>Swap Requests</h3>
+                <p>Check incoming offers</p>
+            </a>
+            <a href="profile.html" class="action-card">
+                <i class="ri-user-settings-line"></i>
+                <h3>Profile</h3>
+                <p>Update details & address</p>
+            </a>
+        </div>
+    </div>
+
+    <script type="module" src="script.js?v=3"></script>
+</body>
+</html>

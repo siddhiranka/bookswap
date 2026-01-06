@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Books - BookSwap</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+</head>
+<body>
+    <nav id="navbar">
+        <div id="navleft">
+            <a href="dashboard.html"><i class="ri-arrow-left-line"></i> Back to Dashboard</a>
+        </div>
+        <div id="navright">
+            <a href="dashboard.html" style="color: white;">Browse Market</a>
+        </div>
+    </nav>
+
+    <div class="library-container" style="padding-top: 15vh;">
+        <div class="search-bar-container">
+            <input type="text" id="searchInput" placeholder="Search by title or author...">
+            <select id="genreFilter">
+                <option value="">All Genres</option>
+                <option value="Fiction">Fiction</option>
+                <option value="Non-Fiction">Non-Fiction</option>
+                <option value="Fantasy">Fantasy</option>
+                <option value="Sci-Fi">Sci-Fi</option>
+                <option value="Academic">Academic</option>
+            </select>
+        </div>
+
+        <div class="my-books-list">
+            <h2>Available Books</h2>
+            <div id="browseGrid" class="books-grid">
+                <p>Loading books...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Swap Request Modal -->
+    <div id="swapModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Request Swap</h2>
+            <p>You are requesting: <b id="targetBookTitle"></b></p>
+            <p>Select one of your books to offer:</p>
+            <form id="swapRequestForm">
+                <select id="myBookSelect" required>
+                    <option value="">Loading your books...</option>
+                </select>
+                <button type="submit" class="submit-btn" style="margin-top: 15px;">Send Request</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { collection, query, where, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const browseGrid = document.getElementById('browseGrid');
+        const searchInput = document.getElementById('searchInput');
+        const genreFilter = document.getElementById('genreFilter');
+        const swapModal = document.getElementById('swapModal');
+        const closeModal = document.querySelector('.close-modal');
+        const myBookSelect = document.getElementById('myBookSelect');
+        const swapRequestForm = document.getElementById('swapRequestForm');
+
+        let currentUser = null;
+        let allBooks = [];
+        let selectedTargetBook = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadMarketBooks();
+            } else {
+                window.location.href = "login.html";
+            }
+        });
+
+        async function loadMarketBooks() {
+            browseGrid.innerHTML = '<p>Loading...</p>';
+            try {
+                // Fetch all available books
+                const q = query(collection(db, "books"), where("status", "==", "available"));
+                const snapshot = await getDocs(q);
+                
+                allBooks = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Filter out my own books
+                    if (data.ownerId !== currentUser.uid) {
+                        allBooks.push({ id: doc.id, ...data });
+                    }
+                });
+
+                // Add 10 Dummy Books for UI demonstration
+                const dummyBooks = [
+                    { id: "d1", title: "The Great Gatsby", author: "F. Scott Fitzgerald", ownerName: "Alice", ownerId: "dummy1", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/71FTb9X6wsL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d2", title: "To Kill a Mockingbird", author: "Harper Lee", ownerName: "Bob", ownerId: "dummy2", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/81gepf1eMqL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d3", title: "1984", author: "George Orwell", ownerName: "Charlie", ownerId: "dummy3", genre: "Sci-Fi", imageURL: "https://m.media-amazon.com/images/I/71kxa1-0mfL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d4", title: "Pride and Prejudice", author: "Jane Austen", ownerName: "Diana", ownerId: "dummy4", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/71Q1tPupKjL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d5", title: "The Catcher in the Rye", author: "J.D. Salinger", ownerName: "Evan", ownerId: "dummy5", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/81OthjkJBuL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d6", title: "The Hobbit", author: "J.R.R. Tolkien", ownerName: "Fiona", ownerId: "dummy6", genre: "Fantasy", imageURL: "https://m.media-amazon.com/images/I/91b0C2YNSrL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d7", title: "Fahrenheit 451", author: "Ray Bradbury", ownerName: "George", ownerId: "dummy7", genre: "Sci-Fi", imageURL: "https://m.media-amazon.com/images/I/61l8LInGe8L._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d8", title: "Jane Eyre", author: "Charlotte Bronte", ownerName: "Hannah", ownerId: "dummy8", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/91zU70Aw9IS._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d9", title: "Animal Farm", author: "George Orwell", ownerName: "Ian", ownerId: "dummy9", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/71JUJ6pGoIL._AC_UF1000,1000_QL80_.jpg", status: "available" },
+                    { id: "d10", title: "Lord of the Flies", author: "William Golding", ownerName: "Jack", ownerId: "dummy10", genre: "Fiction", imageURL: "https://m.media-amazon.com/images/I/81WUAoL-wFL._AC_UF1000,1000_QL80_.jpg", status: "available" }
+                ];
+                allBooks = [...allBooks, ...dummyBooks];
+
+                renderBooks(allBooks);
+            } catch (error) {
+                console.error("Error loading books:", error);
+                browseGrid.innerHTML = '<p>Error loading books.</p>';
+            }
+        }
+
+        function renderBooks(books) {
+            browseGrid.innerHTML = '';
+            if (books.length === 0) {
+                browseGrid.innerHTML = '<p>No books available for swap right now.</p>';
+                return;
+            }
+            books.forEach(book => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.innerHTML = `
+                    <img src="${book.imageURL}" alt="${book.title}">
+                    <div class="book-info">
+                        <h3>${book.title}</h3>
+                        <p>by ${book.author}</p>
+                        <p class="owner-name">Owner: ${book.ownerName || 'Unknown'}</p>
+                        <button class="swap-btn" onclick="openSwapModal('${book.id}')">Request Swap</button>
+                    </div>
+                `;
+                // Attach event listener manually to avoid global scope issues with modules
+                card.querySelector('.swap-btn').addEventListener('click', () => openSwapModal(book));
+                browseGrid.appendChild(card);
+            });
+        }
+
+        // Search and Filter Logic
+        function filterBooks() {
+            const term = searchInput.value.toLowerCase();
+            const genre = genreFilter.value;
+            
+            const filtered = allBooks.filter(book => {
+                const matchesTerm = book.title.toLowerCase().includes(term) || book.author.toLowerCase().includes(term);
+                const matchesGenre = genre === "" || book.genre === genre;
+                return matchesTerm && matchesGenre;
+            });
+            renderBooks(filtered);
+        }
+
+        searchInput.addEventListener('input', filterBooks);
+        genreFilter.addEventListener('change', filterBooks);
+
+        // Modal Logic
+        window.openSwapModal = async (book) => {
+            selectedTargetBook = book;
+            document.getElementById('targetBookTitle').textContent = book.title;
+            swapModal.style.display = "block";
+            
+            // Load my available books for the dropdown
+            myBookSelect.innerHTML = '<option value="">Loading...</option>';
+            const q = query(collection(db, "books"), where("ownerId", "==", currentUser.uid), where("status", "==", "available"));
+            const snapshot = await getDocs(q);
+            
+            myBookSelect.innerHTML = '<option value="">-- Select a book to offer --</option>';
+            if(snapshot.empty) {
+                myBookSelect.innerHTML += '<option disabled>You have no available books to swap.</option>';
+            }
+            snapshot.forEach(doc => {
+                myBookSelect.innerHTML += `<option value="${doc.id}">${doc.data().title}</option>`;
+            });
+        };
+
+        closeModal.onclick = () => swapModal.style.display = "none";
+        window.onclick = (event) => { if (event.target == swapModal) swapModal.style.display = "none"; }
+
+        swapRequestForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const offeredBookId = myBookSelect.value;
+            if(!offeredBookId) return alert("Please select a book to offer.");
+
+            const offeredBookTitle = myBookSelect.options[myBookSelect.selectedIndex].text;
+
+            await addDoc(collection(db, "swap_requests"), {
+                senderId: currentUser.uid,
+                senderName: currentUser.displayName || "User",
+                receiverId: selectedTargetBook.ownerId,
+                receiverName: selectedTargetBook.ownerName,
+                requestedBookId: selectedTargetBook.id,
+                requestedBookTitle: selectedTargetBook.title,
+                offeredBookId: offeredBookId,
+                offeredBookTitle: offeredBookTitle,
+                status: "pending",
+                timestamp: serverTimestamp()
+            });
+
+            alert("Swap request sent successfully!");
+            swapModal.style.display = "none";
+        });
+    </script>
+</body>
+</html>
